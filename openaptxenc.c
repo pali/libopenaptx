@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            fprintf(stderr, "aptX encoder utility\n");
+            fprintf(stderr, "aptX encoder utility %d.%d.%d (using libopenaptx %d.%d.%d)\n", OPENAPTX_MAJOR, OPENAPTX_MINOR, OPENAPTX_PATCH, aptx_major, aptx_minor, aptx_patch);
             fprintf(stderr, "\n");
             fprintf(stderr, "This utility encodes a raw 24 bit signed stereo\n");
             fprintf(stderr, "samples from stdin to aptX or aptX HD on stdout\n");
@@ -78,14 +78,17 @@ int main(int argc, char *argv[])
         processed = aptx_encode(ctx, input_buffer, length, output_buffer, sizeof(output_buffer), &written);
         if (processed != length)
             fprintf(stderr, "%s: aptX encoding stopped in the middle of the sample, dropped %u bytes\n", argv[0], (unsigned int)(length-processed));
-        else if (processed % (8*3*2*4))
-            fprintf(stderr, "%s: aptX encoding stopped in the middle of the sample\n", argv[0]);
         if (fwrite(output_buffer, 1, written, stdout) != written) {
             fprintf(stderr, "%s: aptX encoding failed to write encoded data\n", argv[0]);
             break;
         }
         if (processed != length)
             break;
+    }
+
+    if (aptx_encode_finish(ctx, output_buffer, sizeof(output_buffer), &written)) {
+        if (fwrite(output_buffer, 1, written, stdout) != written)
+            fprintf(stderr, "%s: aptX encoding failed to write encoded data\n", argv[0]);
     }
 
     aptx_finish(ctx);

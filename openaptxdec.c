@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            fprintf(stderr, "aptX decoder utility\n");
+            fprintf(stderr, "aptX decoder utility %d.%d.%d (using libopenaptx %d.%d.%d)\n", OPENAPTX_MAJOR, OPENAPTX_MINOR, OPENAPTX_PATCH, aptx_major, aptx_minor, aptx_patch);
             fprintf(stderr, "\n");
             fprintf(stderr, "This utility decodes aptX or aptX HD audio stream\n");
             fprintf(stderr, "from stdin to a raw 24 bit signed stereo on stdout\n");
@@ -86,12 +86,12 @@ int main(int argc, char *argv[])
     length = fread(input_buffer, 1, 6, stdin);
     if (length >= 4 && memcmp(input_buffer, "\x4b\xbf\x4b\xbf", 4) == 0) {
         if (hd)
-            fprintf(stderr, "%s: Input looks like aptX audio stream (not aptX HD), try without --hd\n", argv[0]);
+            fprintf(stderr, "%s: Input looks like start of aptX audio stream (not aptX HD), try without --hd\n", argv[0]);
     } else if (length >= 6 && memcmp(input_buffer, "\x73\xbe\xff\x73\xbe\xff", 6) == 0) {
         if (!hd)
-            fprintf(stderr, "%s: Input looks like aptX HD audio stream, try with --hd\n", argv[0]);
+            fprintf(stderr, "%s: Input looks like start of aptX HD audio stream, try with --hd\n", argv[0]);
     } else {
-        fprintf(stderr, "%s: Input does not look like aptX nor aptX HD audio stream\n", argv[0]);
+        fprintf(stderr, "%s: Input does not look like start of aptX nor aptX HD audio stream, trying to synchronize\n", argv[0]);
     }
 
     while (length > 0 || !feof(stdin)) {
@@ -140,8 +140,6 @@ int main(int argc, char *argv[])
                 processed = 1;
                 written = 0;
             }
-        } else if (length < sample_size) {
-            fprintf(stderr, "%s: aptX decoding stopped in the middle of the sample\n", argv[0]);
         }
 
         if (written > 0) {

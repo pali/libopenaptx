@@ -21,8 +21,14 @@
 #define OPENAPTX_H
 
 #define OPENAPTX_MAJOR 0
-#define OPENAPTX_MINOR 0
+#define OPENAPTX_MINOR 1
 #define OPENAPTX_PATCH 0
+
+#include <stddef.h>
+
+extern int aptx_major;
+extern int aptx_minor;
+extern int aptx_patch;
 
 struct aptx_context;
 
@@ -63,6 +69,20 @@ size_t aptx_encode(struct aptx_context *ctx,
                    size_t *written);
 
 /*
+ * Finish encoding of current stream and reset internal state to be ready for
+ * encoding new stream. Due to aptX latency, last 90 samples (rounded to 92)
+ * will be filled by this finish function. When output buffer is too small, this
+ * function returns zero, fills buffer only partially, does not reset internal
+ * state and subsequent calls continue filling output buffer. When output buffer
+ * is large enough, then function returns non-zero value. In both cases into
+ * written pointer is stored length of encoded samples.
+ */
+int aptx_encode_finish(struct aptx_context *ctx,
+                       unsigned char *output,
+                       size_t output_len,
+                       size_t *written);
+
+/*
  * Decodes aptX audio samples in input buffer with size input_len to sequence
  * of raw 24bit signed stereo samples into output buffer with size output_len.
  * Return value indicates processed length from input buffer and to written
@@ -72,7 +92,8 @@ size_t aptx_encode(struct aptx_context *ctx,
  * sequence of 24 bytes in format LLLRRRLLLRRRLLLRRRLLLRRR (L-left, R-right)
  * for one aptX sample. Due to aptX parity check it is suggested to provide
  * multiple of eight aptX samples, therefore multiple of 8*4 bytes for aptX
- * reps. 8*6 bytes for aptX HD.
+ * and 8*6 bytes for aptX HD. Due to aptX latency, output buffer starts filling
+ * after 90 samples.
  */
 size_t aptx_decode(struct aptx_context *ctx,
                    const unsigned char *input,

@@ -78,9 +78,10 @@ enum subbands {
 
 #define NB_FILTERS 2
 #define FILTER_TAPS 16
+#define LATENCY_SAMPLES 90
 
 struct aptx_filter_signal {
-    int pos;
+    uint8_t pos;
     int32_t buffer[2*FILTER_TAPS];
 };
 
@@ -124,8 +125,10 @@ struct aptx_channel {
 } ;
 
 struct aptx_context {
-    int hd;
-    int32_t sync_idx;
+    uint8_t hd;
+    uint8_t sync_idx;
+    uint8_t encode_remaining;
+    uint8_t decode_skip_leading;
     struct aptx_channel channels[NB_CHANNELS];
 };
 
@@ -900,20 +903,19 @@ static int32_t aptx_quantized_parity(struct aptx_channel *channel)
 
 /* For each sample, ensure that the parity of all subbands of all channels
  * is 0 except once every 8 samples where the parity is forced to 1. */
-static int aptx_check_parity(struct aptx_channel channels[NB_CHANNELS], int32_t *idx)
+static int aptx_check_parity(struct aptx_channel channels[NB_CHANNELS], uint8_t *sync_idx)
 {
     int32_t parity = aptx_quantized_parity(&channels[LEFT])
                    ^ aptx_quantized_parity(&channels[RIGHT]);
+    int32_t eighth = *sync_idx == 7;
 
-    int eighth = *idx == 7;
-    *idx = (*idx + 1) & 7;
-
+    *sync_idx = (*sync_idx + 1) & 7;
     return parity ^ eighth;
 }
 
-static void aptx_insert_sync(struct aptx_channel channels[NB_CHANNELS], int32_t *idx)
+static void aptx_insert_sync(struct aptx_channel channels[NB_CHANNELS], uint8_t *sync_idx)
 {
-    if (aptx_check_parity(channels, idx)) {
+    if (aptx_check_parity(channels, sync_idx)) {
         int i;
         struct aptx_channel *c;
         static const int map[] = { 1, 2, 0, 3 };
@@ -1022,6 +1024,10 @@ static int aptx_decode_samples(struct aptx_context *ctx,
 }
 
 
+int aptx_major = OPENAPTX_MAJOR;
+int aptx_minor = OPENAPTX_MINOR;
+int aptx_patch = OPENAPTX_PATCH;
+
 struct aptx_context *aptx_init(int hd)
 {
     struct aptx_context *ctx;
@@ -1043,6 +1049,8 @@ void aptx_reset(struct aptx_context *ctx)
     hd = ctx->hd;
     memset(ctx, 0, sizeof(*ctx));
     ctx->hd = hd;
+    ctx->decode_skip_leading = (LATENCY_SAMPLES+3)/4;
+    ctx->encode_remaining = (LATENCY_SAMPLES+3)/4;
 
     for (chan = 0; chan < NB_CHANNELS; chan++) {
         struct aptx_channel *channel = &ctx->channels[chan];
@@ -1071,7 +1079,7 @@ size_t aptx_encode(struct aptx_context *ctx, const unsigned char *input, size_t 
     for (ipos = 0, opos = 0; ipos + 3*NB_CHANNELS*4 <= input_size && opos + sample_size <= output_size; opos += sample_size) {
         for (sample = 0; sample < 4; sample++) {
             for (channel = 0; channel < NB_CHANNELS; channel++, ipos += 3) {
-                /* samples need to contain 24bit signed intger stored as 32bit signed integers */
+                /* samples need to contain 24bit signed integer stored as 32bit signed integers */
                 /* last int8_t --> uint32_t cast propagates sign bit for 32bit integer */
                 samples[channel][sample] = ((uint32_t)input[ipos+0] << 0) |
                                            ((uint32_t)input[ipos+1] << 8) |
@@ -1083,6 +1091,31 @@ size_t aptx_encode(struct aptx_context *ctx, const unsigned char *input, size_t 
 
     *written = opos;
     return ipos;
+}
+
+int aptx_encode_finish(struct aptx_context *ctx, unsigned char *output, size_t output_size, size_t *written)
+{
+    const int32_t samples[NB_CHANNELS][4] = { };
+    int sample_size;
+    size_t opos;
+
+    sample_size = ctx->hd ? 6 : 4;
+
+    if (ctx->encode_remaining == 0) {
+        *written = 0;
+        return 1;
+    }
+
+    for (opos = 0; ctx->encode_remaining > 0 && opos + sample_size <= output_size; ctx->encode_remaining--, opos += sample_size)
+        aptx_encode_samples(ctx, samples, output + opos);
+
+    *written = opos;
+
+    if (ctx->encode_remaining > 0)
+        return 0;
+
+    aptx_reset(ctx);
+    return 1;
 }
 
 size_t aptx_decode(struct aptx_context *ctx, const unsigned char *input, size_t input_size, unsigned char *output, size_t output_size, size_t *written)
@@ -1097,7 +1130,14 @@ size_t aptx_decode(struct aptx_context *ctx, const unsigned char *input, size_t 
     for (ipos = 0, opos = 0; ipos + sample_size <= input_size && opos + 3*NB_CHANNELS*4 <= output_size; ipos += sample_size) {
         if (aptx_decode_samples(ctx, input + ipos, samples))
             break;
-        for (sample = 0; sample < 4; sample++) {
+        sample = 0;
+        if (ctx->decode_skip_leading > 0) {
+            ctx->decode_skip_leading--;
+            if (ctx->decode_skip_leading > 0)
+                continue;
+            sample = LATENCY_SAMPLES%4;
+        }
+        for (; sample < 4; sample++) {
             for (channel = 0; channel < NB_CHANNELS; channel++, opos += 3) {
                 /* samples contain 24bit signed integers stored as 32bit signed integers */
                 /* we do not need to care about negative integers specially as they have 24. bit set */

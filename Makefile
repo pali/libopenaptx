@@ -1,5 +1,5 @@
 MAJOR := 0
-MINOR := 0
+MINOR := 1
 PATCH := 0
 
 PREFIX := /usr/local
@@ -11,9 +11,10 @@ LIBNAME := libopenaptx.so
 SONAME := $(LIBNAME).$(MAJOR)
 FILENAME := $(SONAME).$(MINOR).$(PATCH)
 
-UTILITIES := openaptxenc openaptxdec
+UTILITIES := openaptxenc openaptxdec openaptxenc-static openaptxdec-static
 
 HEADERS := openaptx.h
+SOURCES := openaptx.c
 
 BUILD := $(FILENAME) $(SONAME) $(LIBNAME) $(UTILITIES)
 
@@ -27,14 +28,17 @@ install: $(BUILD)
 	mkdir -p $(DESTDIR)/$(PREFIX)/$(INCDIR)
 	cp -a $(HEADERS) $(DESTDIR)/$(PREFIX)/$(INCDIR)
 
-$(FILENAME): openaptx.c $(HEADERS)
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -I. -shared -fPIC -Wl,-soname,$(SONAME) -o $@ $<
+$(FILENAME): $(SOURCES) $(HEADERS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -I. -shared -fPIC -Wl,-soname,$(SONAME) -o $@ $(SOURCES)
 
 $(SONAME): $(FILENAME)
 	ln -sf $< $@
 
 $(LIBNAME): $(SONAME)
 	ln -sf $< $@
+
+%-static: %.c $(SOURCES) $(HEADERS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -I. -o $@ $< $(SOURCES)
 
 %: %.c $(LIBNAME) $(HEADERS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -I. -o $@ $< $(LIBNAME)
