@@ -4,27 +4,35 @@ mainly used in Bluetooth A2DP profile.
 
 It provides dynamic linked shared library libopenaptx.so and simple command line
 utilities openaptxenc and openaptxdec for encoding and decoding operations.
+Documentation for shared library is provided in C header file openaptx.h.
+
 There is support for aptX and aptX HD codec variants. Both variants operates on
 a raw 24 bit signed stereo audio samples. aptX provides fixed compress ratio 6:1
 and aptX HD fixed compress ratio 4:1.
 
 For building and installing into system simply run: make install. For building
-without installing run: LD_RUN_PATH='$ORIGIN' make
+without installing run: LD_RUN_PATH='$ORIGIN' make. For producing windows builds
+run: make SOFILENAME=openaptx0.dll.
+
+It is suggested to compile library with -O3 optimizations (enabled by default
+when env variable CFLAGS is not set) and -mavx2 switch (not enabled by default,
+needs CPU with AVX2: Intel Haswell or AMD Excavator) as it provides significant
+boost to the performance.
 
 Usage of command line utilities together with sox for resampling or playing:
 
 To convert Wave audio file sample.wav into aptX audio file sample.aptx run:
 
-$ sox sample.wav -t raw -r 44.1k -s -3 -c 2 - | openaptxenc > sample.aptx
+$ sox sample.wav -t raw -r 44.1k -L -e s -b 24 -c 2 - | openaptxenc > sample.aptx
 
 To convert aptX audio file sample.aptx into Wave audio file sample.wav run:
 
-$ openaptxdec < sample.aptx | sox -t raw -r 44.1k -s -3 -c 2 - sample.wav
+$ openaptxdec < sample.aptx | sox -t raw -r 44.1k -L -e s -b 24 -c 2 - sample.wav
 
 To convert MP3 audio file sample.mp3 into aptX HD audio file sample.aptxhd run:
 
-$ sox sample.mp3 -t raw -r 44.1k -s -3 -c 2 - | openaptxenc --hd > sample.aptxhd
+$ sox sample.mp3 -t raw -r 44.1k -L -e s -b 24 -c 2 - | openaptxenc --hd > sample.aptxhd
 
 To play aptX HD audio file sample.aptxhd run:
 
-$ openaptxdec --hd < sample.aptxhd | play -t raw -r 44.1k -s -3 -c 2 -
+$ openaptxdec --hd < sample.aptxhd | play -t raw -r 44.1k -L -e s -b 24 -c 2 -

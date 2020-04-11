@@ -1,6 +1,6 @@
 /*
  * aptX decoder utility
- * Copyright (C) 2018  Pali Rohár <pali.rohar@gmail.com>
+ * Copyright (C) 2018-2020  Pali Rohár <pali.rohar@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,29 +14,39 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #include <stdio.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 #include <openaptx.h>
 
-static unsigned char input_buffer[512*8*6];
-static unsigned char output_buffer[512*8*3*2*4*6/4];
+static unsigned char input_buffer[512*6];
+static unsigned char output_buffer[512*3*2*6+3*2*4];
 
 int main(int argc, char *argv[])
 {
     int i;
     int hd;
+    int ret;
     size_t length;
-    size_t offset;
-    size_t sample_size;
-    size_t process_size;
     size_t processed;
     size_t written;
+    size_t dropped;
+    int synced;
+    int syncing;
     struct aptx_context *ctx;
-    unsigned int failed;
+
+#ifdef _WIN32
+    _setmode(_fileno(stdin), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
 
     hd = 0;
 
@@ -49,6 +59,9 @@ int main(int argc, char *argv[])
             fprintf(stderr, "\n");
             fprintf(stderr, "When input is damaged it tries to synchronize and recover\n");
             fprintf(stderr, "\n");
+            fprintf(stderr, "Non-zero return value indicates that input was damaged\n");
+            fprintf(stderr, "and some bytes from input aptX audio stream were dropped\n");
+            fprintf(stderr, "\n");
             fprintf(stderr, "Usage:\n");
             fprintf(stderr, "        %s [options]\n", argv[0]);
             fprintf(stderr, "\n");
@@ -57,9 +70,9 @@ int main(int argc, char *argv[])
             fprintf(stderr, "        --hd         Decode from aptX HD\n");
             fprintf(stderr, "\n");
             fprintf(stderr, "Examples:\n");
-            fprintf(stderr, "        %s < sample.aptx > sample.s24\n", argv[0]);
-            fprintf(stderr, "        %s --hd < sample.aptxhd > sample.s24\n", argv[0]);
-            fprintf(stderr, "        %s < sample.aptx | play -t raw -r 44.1k -s -3 -c 2 -\n", argv[0]);
+            fprintf(stderr, "        %s < sample.aptx > sample.s24le\n", argv[0]);
+            fprintf(stderr, "        %s --hd < sample.aptxhd > sample.s24le\n", argv[0]);
+            fprintf(stderr, "        %s < sample.aptx | play -t raw -r 44.1k -L -e s -b 24 -c 2 -\n", argv[0]);
             return 1;
         } else if (strcmp(argv[i], "--hd") == 0) {
             hd = 1;
@@ -69,20 +82,16 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* every eight sample contains synchronization parity check */
-    sample_size = 8 * (hd ? 6 : 4);
-
     ctx = aptx_init(hd);
     if (!ctx) {
-        fprintf(stderr, "%s: Cannot initialize aptX encoder\n", argv[0]);
+        fprintf(stderr, "%s: Cannot initialize aptX decoder\n", argv[0]);
         return 1;
     }
 
-    failed = 0;
-    offset = 0;
-
-    /* Try to guess type of input stream based on the first six bytes
-     * Encoder produces fixed first sample because aptX predictor has fixed values */
+    /*
+     * Try to guess type of input stream based on the first six bytes
+     * Encoder produces fixed first sample because aptX predictor has fixed values
+     */
     length = fread(input_buffer, 1, 6, stdin);
     if (length >= 4 && memcmp(input_buffer, "\x4b\xbf\x4b\xbf", 4) == 0) {
         if (hd)
@@ -91,76 +100,89 @@ int main(int argc, char *argv[])
         if (!hd)
             fprintf(stderr, "%s: Input looks like start of aptX HD audio stream, try with --hd\n", argv[0]);
     } else {
-        fprintf(stderr, "%s: Input does not look like start of aptX nor aptX HD audio stream, trying to synchronize\n", argv[0]);
+        if (length >= 4 && memcmp(input_buffer, "\x6b\xbf\x6b\xbf", 4) == 0)
+            fprintf(stderr, "%s: Input looks like start of standard aptX audio stream, which is not supported yet\n", argv[0]);
+        else
+            fprintf(stderr, "%s: Input does not look like start of aptX nor aptX HD audio stream\n", argv[0]);
     }
 
-    while (length > 0 || !feof(stdin)) {
-        /* For decoding we need at least eight samples for synchronization */
-        if (length < sample_size && !feof(stdin)) {
-            if (length > 0)
-                memmove(input_buffer, input_buffer + offset, length);
-            offset = 0;
-            length += fread(input_buffer + length, 1, sizeof(input_buffer) - length, stdin);
-            if (ferror(stdin))
-                fprintf(stderr, "%s: aptX encoding failed to read input data\n", argv[0]);
-        }
+    ret = 0;
+    syncing = 0;
 
-        process_size = length;
+    while (length > 0) {
+        processed = aptx_decode_sync(ctx, input_buffer, length, output_buffer, sizeof(output_buffer), &written, &synced, &dropped);
 
-        /* Always process multiple of the 8 samples (expect last) for synchronization support */
-        if (length >= sample_size)
-            process_size -= process_size % sample_size;
-
-        /* When decoding previous samples failed, reset internal state, predictor and state of the synchronization parity */
-        if (failed > 0)
-            aptx_reset(ctx);
-
-        processed = aptx_decode(ctx, input_buffer + offset, process_size, output_buffer, sizeof(output_buffer), &written);
-
-        if (processed > sample_size && failed > 0) {
-            fprintf(stderr, "%s: ... synchronization successful, dropped %u bytes\n", argv[0], failed);
-            failed = 0;
-        }
-
-        /* If we have not decoded all supplied samples then decoding failed */
-        if (processed != process_size) {
-            if (failed == 0) {
-                if (length < sample_size)
-                    fprintf(stderr, "%s: aptX decoding stopped in the middle of the sample, dropped %u bytes\n", argv[0], (unsigned int)(length-processed));
-                else
-                    fprintf(stderr, "%s: aptX decoding failed, trying to synchronize ...\n", argv[0]);
+        /* Check all possible states of synced, syncing and dropped status */
+        if (!synced) {
+            if (!syncing) {
+                fprintf(stderr, "%s: aptX decoding failed, synchronizing\n", argv[0]);
+                syncing = 1;
+                ret = 1;
             }
-            if (length >= sample_size)
-                failed++;
-            else if (failed > 0)
-                failed += length;
-            if (processed <= sample_size) {
-                /* If we have not decoded at least 8 samples (with proper parity check)
-                 * drop decoded buffer and try decoding again on next byte */
-                processed = 1;
-                written = 0;
+            if (dropped) {
+                fprintf(stderr, "%s: aptX synchronization successful, dropped %lu byte%s\n", argv[0], (unsigned long)dropped, (dropped != 1) ? "s" : "");
+                syncing = 0;
+                ret = 1;
+            }
+            if (!syncing) {
+                fprintf(stderr, "%s: aptX decoding failed, synchronizing\n", argv[0]);
+                syncing = 1;
+                ret = 1;
+            }
+        } else {
+            if (dropped) {
+                if (!syncing)
+                    fprintf(stderr, "%s: aptX decoding failed, synchronizing\n", argv[0]);
+                fprintf(stderr, "%s: aptX synchronization successful, dropped %lu byte%s\n", argv[0], (unsigned long)dropped, (dropped != 1) ? "s" : "");
+                syncing = 0;
+                ret = 1;
+            } else if (syncing) {
+                fprintf(stderr, "%s: aptX synchronization successful\n", argv[0]);
+                syncing = 0;
+                ret = 1;
             }
         }
+
+        /* If we have not decoded all supplied samples then decoding unrecoverable failed */
+        if (processed != length) {
+            fprintf(stderr, "%s: aptX decoding failed\n", argv[0]);
+            ret = 1;
+            break;
+        }
+
+        if (!feof(stdin)) {
+            length = fread(input_buffer, 1, sizeof(input_buffer), stdin);
+            if (ferror(stdin)) {
+                fprintf(stderr, "%s: aptX decoding failed to read input data\n", argv[0]);
+                ret = 1;
+                length = 0;
+            }
+        } else {
+            length = 0;
+        }
+
+        /* On the end of the input stream last two decoded samples are just padding and not a real data */
+        if (length == 0 && !ferror(stdin) && written >= 6*2)
+            written -= 6*2;
 
         if (written > 0) {
             if (fwrite(output_buffer, 1, written, stdout) != written) {
                 fprintf(stderr, "%s: aptX decoding failed to write decoded data\n", argv[0]);
-                failed = 0;
-                length = 0;
+                ret = 1;
                 break;
             }
         }
-
-        if (length < sample_size)
-            break;
-
-        length -= processed;
-        offset += processed;
     }
 
-    if (failed > 0)
-        fprintf(stderr, "%s ... synchronization failed, dropped %u bytes\n", argv[0], failed);
+    dropped = aptx_decode_sync_finish(ctx);
+    if (dropped && !syncing) {
+        fprintf(stderr, "%s: aptX decoding stopped in the middle of the sample, dropped %lu byte%s\n", argv[0], (unsigned long)dropped, (dropped != 1) ? "s" : "");
+        ret = 1;
+    } else if (syncing) {
+        fprintf(stderr, "%s: aptX synchronization failed\n", argv[0]);
+        ret = 1;
+    }
 
     aptx_finish(ctx);
-    return 0;
+    return ret;
 }
