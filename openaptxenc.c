@@ -62,8 +62,11 @@ int main(int argc, char *argv[])
             fprintf(stderr, "        --hd         Encode to aptX HD\n");
             fprintf(stderr, "\n");
             fprintf(stderr, "Examples:\n");
+            fprintf(stderr, "\n");
             fprintf(stderr, "        %s < sample.s24le > sample.aptx\n", argv[0]);
+            fprintf(stderr, "\n");
             fprintf(stderr, "        %s --hd < sample.s24le > sample.aptxhd\n", argv[0]);
+            fprintf(stderr, "\n");
             fprintf(stderr, "        sox sample.wav -t raw -r 44.1k -L -e s -b 24 -c 2 - | %s > sample.aptx\n", argv[0]);
             return 1;
         } else if (strcmp(argv[i], "--hd") == 0) {

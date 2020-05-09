@@ -70,8 +70,11 @@ int main(int argc, char *argv[])
             fprintf(stderr, "        --hd         Decode from aptX HD\n");
             fprintf(stderr, "\n");
             fprintf(stderr, "Examples:\n");
+            fprintf(stderr, "\n");
             fprintf(stderr, "        %s < sample.aptx > sample.s24le\n", argv[0]);
+            fprintf(stderr, "\n");
             fprintf(stderr, "        %s --hd < sample.aptxhd > sample.s24le\n", argv[0]);
+            fprintf(stderr, "\n");
             fprintf(stderr, "        %s < sample.aptx | play -t raw -r 44.1k -L -e s -b 24 -c 2 -\n", argv[0]);
             return 1;
         } else if (strcmp(argv[i], "--hd") == 0) {
