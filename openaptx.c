@@ -31,6 +31,9 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(*(a)))
 #define DIFFSIGN(x,y) (((x)>(y)) - ((x)<(y)))
 
+#define STRINGIZE(x) STRINGIZE_(x)
+#define STRINGIZE_(x) #x
+
 /*
  * Clip a signed integer into the -(2^p),(2^p-1) range.
  * @param  a value to clip
@@ -127,6 +130,7 @@ struct aptx_context {
     size_t decode_dropped;
     struct aptx_channel channels[NB_CHANNELS];
     uint8_t hd;
+    uint8_t swap;
     uint8_t sync_idx;
     uint8_t encode_remaining;
     uint8_t decode_skip_leading;
@@ -1110,6 +1114,7 @@ struct aptx_context *aptx_init(int hd)
 void aptx_reset(struct aptx_context *ctx)
 {
     const uint8_t hd = ctx->hd;
+    const uint8_t swap = ctx->swap;
     unsigned i, chan, subband;
     struct aptx_channel *channel;
     struct aptx_prediction *prediction;
@@ -1118,6 +1123,7 @@ void aptx_reset(struct aptx_context *ctx)
         ((unsigned char *)ctx)[i] = 0;
 
     ctx->hd = hd;
+    ctx->swap = swap;
     ctx->decode_skip_leading = (LATENCY_SAMPLES+3)/4;
     ctx->encode_remaining = (LATENCY_SAMPLES+3)/4;
 
@@ -1322,3 +1328,96 @@ size_t aptx_decode_sync_finish(struct aptx_context *ctx)
     aptx_reset(ctx);
     return dropped;
 }
+
+#if ENABLE_QUALCOMM_API
+
+APTXENC NewAptxEnc(int swap)
+{
+    static struct aptx_context ctx;
+    aptxbtenc_init(&ctx, swap);
+    return &ctx;
+}
+
+APTXENC NewAptxhdEnc(int swap)
+{
+    static struct aptx_context ctx;
+    aptxhdbtenc_init(&ctx, swap);
+    return &ctx;
+}
+
+int aptxbtenc_init(APTXENC enc, int swap)
+{
+    enc->hd = 0;
+    enc->swap = swap;
+    aptx_reset(enc);
+    return 0;
+}
+
+int aptxhdbtenc_init(APTXENC enc, int swap)
+{
+    enc->hd = 1;
+    enc->swap = swap;
+    aptx_reset(enc);
+    return 0;
+}
+
+void aptxbtenc_destroy(APTXENC enc) {
+    (void)enc;
+}
+
+void aptxhdbtenc_destroy(APTXENC enc) {
+    (void)enc;
+}
+
+int aptxbtenc_encodestereo(APTXENC enc, const int32_t pcmL[4], const int32_t pcmR[4], uint16_t code[2])
+{
+    int32_t samples[NB_CHANNELS][4] = {
+        { pcmL[0] << 8, pcmL[1] << 8, pcmL[2] << 8, pcmL[3] << 8 },
+        { pcmR[0] << 8, pcmR[1] << 8, pcmR[2] << 8, pcmR[3] << 8 }};
+    aptx_encode_samples(enc, samples, (uint8_t *)code);
+    return 0;
+}
+
+int aptxhdbtenc_encodestereo(APTXENC enc, const int32_t pcmL[4], const int32_t pcmR[4], uint32_t code[2])
+{
+    int32_t samples[NB_CHANNELS][4] = {
+        { pcmL[0], pcmL[1], pcmL[2], pcmL[3] },
+        { pcmR[0], pcmR[1], pcmR[2], pcmR[3] }};
+    uint8_t output[6] = { 0 };
+    aptx_encode_samples(enc, samples, output);
+    code[0] = ((uint32_t)output[2]) | ((uint32_t)output[1] << 8) | ((uint32_t)output[0] << 16);
+    code[1] = ((uint32_t)output[5]) | ((uint32_t)output[4] << 8) | ((uint32_t)output[3] << 16);
+    return 0;
+}
+
+size_t SizeofAptxbtenc(void)
+{
+    return sizeof(struct aptx_context);
+}
+
+size_t SizeofAptxhdbtenc(void)
+{
+    return SizeofAptxbtenc();
+}
+
+const char *aptxbtenc_build(void)
+{
+    return "libopenaptx-" STRINGIZE(OPENAPTX_MAJOR) "." STRINGIZE(OPENAPTX_MINOR) "." STRINGIZE(OPENAPTX_PATCH);
+}
+
+const char *aptxhdbtenc_build(void)
+{
+    return aptxbtenc_build();
+}
+
+const char *aptxbtenc_version(void)
+{
+    return STRINGIZE(OPENAPTX_MAJOR) "." STRINGIZE(OPENAPTX_MINOR) "." STRINGIZE(OPENAPTX_PATCH);
+}
+
+const char *aptxhdbtenc_version(void)
+{
+    return aptxbtenc_version();
+}
+
+#endif

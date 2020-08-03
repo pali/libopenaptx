@@ -21,10 +21,11 @@
 #define OPENAPTX_H
 
 #define OPENAPTX_MAJOR 0
-#define OPENAPTX_MINOR 2
+#define OPENAPTX_MINOR 3
 #define OPENAPTX_PATCH 0
 
 #include <stddef.h>
+#include <stdint.h>
 
 extern const int aptx_major;
 extern const int aptx_minor;
@@ -139,5 +140,48 @@ size_t aptx_decode_sync(struct aptx_context *ctx,
  * it is number of dropped input bytes.
  */
 size_t aptx_decode_sync_finish(struct aptx_context *ctx);
+
+#if ENABLE_QUALCOMM_API
+
+/*
+ * The following definitions are provided for API compatibility with Qualcomm
+ * apt-X encoder library, so libopenaptx can be used as a drop-in replacement
+ * for bt-aptX-4.2.2 or aptXHD-1.0.0 libraries found of various Android-based
+ * smartphones.
+ *
+ * Use this API only if you want to be compatible with Qualcomm apt-X library.
+ * Otherwise, please, use API provided by libopenaptx library defined above.
+ */
+
+typedef struct aptx_context * APTXENC;
+
+APTXENC NewAptxEnc(int swap);
+APTXENC NewAptxhdEnc(int swap);
+
+size_t SizeofAptxbtenc(void);
+size_t SizeofAptxhdbtenc(void);
+
+int aptxbtenc_init(APTXENC enc, int swap);
+int aptxhdbtenc_init(APTXENC enc, int swap);
+
+void aptxbtenc_destroy(APTXENC enc);
+void aptxhdbtenc_destroy(APTXENC enc);
+
+int aptxbtenc_encodestereo(APTXENC enc,
+                           const int32_t pcmL[4],
+                           const int32_t pcmR[4],
+                           uint16_t code[2]);
+int aptxhdbtenc_encodestereo(APTXENC enc,
+                             const int32_t pcmL[4],
+                             const int32_t pcmR[4],
+                             uint32_t code[2]);
+
+const char *aptxbtenc_build(void);
+const char *aptxhdbtenc_build(void);
+
+const char *aptxbtenc_version(void);
+const char *aptxhdbtenc_version(void);
+
+#endif
 
 #endif

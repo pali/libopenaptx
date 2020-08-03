@@ -8,7 +8,7 @@ LNS = ln -sf
 MKDIR = mkdir -p
 PRINTF = printf
 
-CFLAGS = -W -Wall -O3
+CFLAGS = -W -Wall -O3 -DENABLE_QUALCOMM_API=1
 LDFLAGS = -s
 ARFLAGS = -rcs
 
@@ -20,7 +20,7 @@ PKGDIR = $(LIBDIR)/pkgconfig
 
 NAME = openaptx
 MAJOR = 0
-MINOR = 2
+MINOR = 3
 PATCH = 0
 
 LIBNAME = lib$(NAME).so
