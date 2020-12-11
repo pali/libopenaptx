@@ -8,7 +8,7 @@ LNS = ln -sf
 MKDIR = mkdir -p
 PRINTF = printf
 
-CFLAGS = -W -Wall -O3
+CFLAGS = -W -Wall -O3 -DAPTX_API=extern
 LDFLAGS = -s
 ARFLAGS = -rcs
 

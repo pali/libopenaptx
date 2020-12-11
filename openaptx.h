@@ -26,9 +26,28 @@
 
 #include <stddef.h>
 
-extern const int aptx_major;
-extern const int aptx_minor;
-extern const int aptx_patch;
+/* Symbol visibility
+ *
+ * Note: To link to openaptx statically on Windows, you must define
+ * APTX_STATIC_COMPILATION or the prototypes will cause the compiler to
+ * search for the symbol inside a DLL. */
+#if defined(_MSC_VER) && !defined(APTX_STATIC_COMPILATION)
+# define APTX_API_IMPORT __declspec(dllimport) extern
+#else
+# define APTX_API_IMPORT extern
+#endif
+
+#ifndef APTX_API
+# ifdef BUILDING_APTX
+#  define APTX_API APTX_API_EXPORT     /* set via compiler flags or config.h */
+# else
+#  define APTX_API APTX_API_IMPORT
+# endif
+#endif
+
+APTX_API const int aptx_major;
+APTX_API const int aptx_minor;
+APTX_API const int aptx_patch;
 
 struct aptx_context;
 
@@ -37,17 +56,20 @@ struct aptx_context;
  * hd = 0 process aptX codec
  * hd = 1 process aptX HD codec
  */
+APTX_API
 struct aptx_context *aptx_init(int hd);
 
 /*
  * Reset internal state, predictor and parity sync of aptX context.
  * It is needed when going to encode or decode a new stream.
  */
+APTX_API
 void aptx_reset(struct aptx_context *ctx);
 
 /*
  * Free aptX context initialized by aptx_init().
  */
+APTX_API
 void aptx_finish(struct aptx_context *ctx);
 
 /*
@@ -60,6 +82,7 @@ void aptx_finish(struct aptx_context *ctx);
  * encoded sequence of either four bytes (LLRR) of aptX or six bytes (LLLRRR)
  * of aptX HD.
  */
+APTX_API
 size_t aptx_encode(struct aptx_context *ctx,
                    const unsigned char *input,
                    size_t input_size,
@@ -76,6 +99,7 @@ size_t aptx_encode(struct aptx_context *ctx,
  * When output buffer is large enough, then function returns non-zero value.
  * In both cases into written pointer is stored length of encoded samples.
  */
+APTX_API
 int aptx_encode_finish(struct aptx_context *ctx,
                        unsigned char *output,
                        size_t output_size,
@@ -98,6 +122,7 @@ int aptx_encode_finish(struct aptx_context *ctx,
  * samples are rounded to the multiple by four and latency is 90 samples so
  * last 2 samples are just padding.
  */
+APTX_API
 size_t aptx_decode(struct aptx_context *ctx,
                    const unsigned char *input,
                    size_t input_size,
@@ -122,6 +147,7 @@ size_t aptx_decode(struct aptx_context *ctx,
  * already processed. Functions aptx_decode() and aptx_decode_sync() should not
  * be mixed together.
  */
+APTX_API
 size_t aptx_decode_sync(struct aptx_context *ctx,
                         const unsigned char *input,
                         size_t input_size,
@@ -138,6 +164,7 @@ size_t aptx_decode_sync(struct aptx_context *ctx,
  * by next aptx_decode_sync() call, therefore in time of calling this function
  * it is number of dropped input bytes.
  */
+APTX_API
 size_t aptx_decode_sync_finish(struct aptx_context *ctx);
 
 #endif

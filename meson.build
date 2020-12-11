@@ -11,8 +11,33 @@ soversion = version_major
 libversion = '@0@.@1@.0'.format(version_major, version_minor, version_micro)
 osxversion = version_minor + 1
 
+cc = meson.get_compiler('c')
+
+add_project_arguments('-DHAVE_CONFIG_H', language: 'c')
+
+cdata = configuration_data()
+
+# Symbol visibility
+if cc.get_id() == 'msvc'
+  export_define = '__declspec(dllexport) extern'
+elif cc.has_argument('-fvisibility=hidden')
+  add_project_arguments('-fvisibility=hidden', language: 'c')
+  export_define = 'extern __attribute__ ((visibility ("default")))'
+else
+  export_define = 'extern'
+endif
+
+# Passing this through the command line would be too messy
+cdata.set('APTX_API_EXPORT', export_define)
+
+static_cflags = []
+if get_option('default_library') == 'static'
+  static_cflags += ['-DAPTX_STATIC_COMPILATION']
+endif
+
 # library
 libopenaptx = library('openaptx', 'openaptx.c',
+   c_args: ['-DBUILDING_APTX'],
    version: libversion,
    soversion: soversion,
    darwin_versions: osxversion)
@@ -20,15 +45,20 @@ libopenaptx = library('openaptx', 'openaptx.c',
 openaptx_incdir = include_directories('.')
 
 openaptx_dep = declare_dependency(link_with: libopenaptx,
-  include_directories: openaptx_incdir)
+  include_directories: openaptx_incdir,
+  compile_args: static_cflags)
 
 meson.override_dependency('openaptx', openaptx_dep)
+
+# config.h
+configure_file(output: 'config.h', configuration: cdata)
 
 # pkg-config file
 pkg = import('pkgconfig')
 pkg.generate(libopenaptx,
   name: 'libopenaptx',
-  description: 'Open Source aptX codec library')
+  description: 'Open Source aptX codec library',
+  extra_cflags: static_cflags)
 
 # tools
 if not get_option('tools').disabled()
