@@ -1,0 +1,2 @@
+option('tools', type : 'feature', value : 'auto',
+  description: 'Build openaptx command line tools')
