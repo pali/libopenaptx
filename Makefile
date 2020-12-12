@@ -1,6 +1,6 @@
 .POSIX:
 .SUFFIXES:
-.PHONY: all clean install uninstall
+.PHONY: default all clean install uninstall
 
 RM = rm -f
 CP = cp -a
@@ -39,12 +39,14 @@ IOBJECTS = $(NAME)enc.o $(NAME)dec.o
 
 BUILD = $(SOFILENAME) $(SONAME) $(LIBNAME) $(ANAME) $(AOBJECTS) $(IOBJECTS) $(UTILITIES) $(STATIC_UTILITIES)
 
+default: $(SOFILENAME) $(SONAME) $(LIBNAME) $(ANAME) $(UTILITIES) $(HEADERS)
+
 all: $(BUILD)
 
 clean:
 	$(RM) $(BUILD)
 
-install: $(SOFILENAME) $(SONAME) $(LIBNAME) $(ANAME) $(UTILITIES) $(HEADERS)
+install: default
 	$(MKDIR) $(DESTDIR)$(PREFIX)/$(LIBDIR)
 	$(CP) $(SOFILENAME) $(SONAME) $(LIBNAME) $(ANAME) $(DESTDIR)$(PREFIX)/$(LIBDIR)
 	$(MKDIR) $(DESTDIR)$(PREFIX)/$(BINDIR)
