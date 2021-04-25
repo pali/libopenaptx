@@ -1,3 +1,22 @@
+# Open Source implementation of Audio Processing Technology codec (aptX)
+# Copyright (C) 2018-2021  Pali Rohár <pali.rohar@gmail.com>
+#
+# Read README file for license details.  Due to license abuse
+# this library must not be used in any Freedesktop project.
+#
+# This library is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this library.  If not, see <http://www.gnu.org/licenses/>.
+
 .POSIX:
 .SUFFIXES:
 .PHONY: default all clean install uninstall
@@ -21,7 +40,7 @@ PKGDIR = $(LIBDIR)/pkgconfig
 NAME = openaptx
 MAJOR = 0
 MINOR = 2
-PATCH = 0
+PATCH = 1
 
 LIBNAME = lib$(NAME).so
 SONAME = $(LIBNAME).$(MAJOR)

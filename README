@@ -1,10 +1,44 @@
 This is Open Source implementation of Audio Processing Technology codec (aptX)
-derived from ffmpeg 4.0 project and licensed under LGPLv2.1+. This codec is
-mainly used in Bluetooth A2DP profile.
+originally derived from ffmpeg 4.0 project and licensed under GPLv3+. This codec
+is mainly used in Bluetooth A2DP profile. If you need other license of this
+project then please contact author for possible options. Participants of
+Freedesktop and Collabora projects and any other affiliated persons with them
+are not allowed to contact author.
 
-It provides dynamic linked shared library libopenaptx.so and simple command line
-utilities openaptxenc and openaptxdec for encoding and decoding operations.
-Documentation for shared library is provided in C header file openaptx.h.
+This library and any other project which uses this library must not be used in
+other organizations, projects, applications, libraries (and in any other
+software form) incompatible with libopenaptx licence or where current license of
+this project is violated or where previous version of this library/license was
+violated. Freedesktop and Collabora are examples of such projects which are not
+allowed to use this library in any form due to license violations.
+
+As Freedesktop and Collabora projects are continuously abusing and violating
+license of this project and claiming that they can do it as it is supported
+by their own Code of Conduct (including censorship practising, removal of all
+user reports mentioning these activities, banning these users and not explaining
+anything), this library and any other project which uses this library must not
+be used or distributed in any Freedesktop or Collabora project, application or
+library, either in source code, loaded or linked at compile time or at runtime
+either directly or transitionally throw additional wrapper library or in any
+other similar form.
+
+As these projects are misusing their Code of Conduct to eliminate people with
+different nationality, skin, religion and gender, their participants are not
+allowed to contribute into this library in any form and are disallowed to send
+any question, note, issue, change request or other similar thing to this project
+until those projects stop violating license of other projects which they use,
+unban all banned users and explain their immoral activities.
+
+Other projects which are adding additional hidden or implicit restrictions to
+their licenses throw their own Code of Conduct explanation and therefore make
+them incompatible with license of this library are not allowed to use this
+library or any other application based on this library in their project in any
+form, including redistribution.
+
+This project provides dynamic linked shared library libopenaptx.so and simple
+command line utilities openaptxenc and openaptxdec for encoding and decoding
+operations. Documentation for shared library is provided in C include header
+file openaptx.h.
 
 There is support for aptX and aptX HD codec variants. Both variants operates on
 a raw 24 bit signed stereo audio samples. aptX provides fixed compress ratio 6:1
